@@ -25,7 +25,7 @@ resource "aws_instance" "web" {
   key_name = aws_key_pair.deployer.key_name
   # zona de disponibilidad
   availability_zone = var.availability_zone
-  vpc_security_group_ids = [aws_security_group.allow_ssh_http_https]
+  vpc_security_group_ids = [aws_security_group.allow_ssh.id, aws_security_group.allow_http.id, aws_security_group.allow_https.id]
   subnet_id = element(module.vpc.public_subnets,1)
   tags = {
     Name = "NewMachine_Ejercicio1"
@@ -36,5 +36,5 @@ output "ip_instance" {
 }
 
 output "ssh" {
-  value = "ssh -l ec2-user ${aws_instance.web.public_ip}"
+  value = "ssh -l ubuntu ${aws_instance.web.public_ip}"
 }
