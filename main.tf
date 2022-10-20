@@ -15,7 +15,7 @@ resource "aws_key_pair" "deployer" {
  }
 }
 
-
+#EBS
 module "vpc" {
  source = "terraform-aws-modules/vpc/aws"
  name = "vpc-main"
