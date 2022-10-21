@@ -3,9 +3,9 @@ provider "aws" {
  region = "eu-west-3"
 }
 
-#Variables
 variable "ssh_key_path" {}
 variable "availability_zone" {}
+variable "project_name" {}
 
 # Recurso de clave SSH en AWS
 resource "aws_key_pair" "deployer-key" {
@@ -16,7 +16,7 @@ resource "aws_key_pair" "deployer-key" {
  }
 }
 
-# MODULO DE VPC
+
 module "vpc" {
  source = "terraform-aws-modules/vpc/aws"
  name = "vpc-main"
@@ -31,16 +31,21 @@ module "vpc" {
  tags = { Terraform = "true", Environment = "dev" }
 }
 
-#Recurso SG - SSH y HTTP
-resource "aws_security_group" "allow_ssh" {
- name = "allow_ssh"
+resource "aws_security_group" "allow_ssh_http" {
+ name = "allow_ssh_http"
  description = "Allow SSH inbound traffic"
  vpc_id = module.vpc.vpc_id
 
 ingress {
- description = "SSH from VPC"
  from_port = 22
  to_port = 22
+ protocol = "tcp"
+ cidr_blocks = ["0.0.0.0/0"]
+ }
+
+ingress {
+ from_port = 80
+ to_port = 80
  protocol = "tcp"
  cidr_blocks = ["0.0.0.0/0"]
  }
@@ -57,7 +62,29 @@ egress {
  }
 }
 
+// 16kB tamaño maximo
+data "template_file" "userdata" {
+  template = file("${path.module}/user_data.sh")
+}
 
+
+resource "aws_instance" "web" {
+ ami = data.aws_ami.ubuntu.id
+ instance_type = "t3.micro"
+ key_name = aws_key_pair.deployer-key.key_name
+ vpc_security_group_ids = [aws_security_group.allow_ssh_http.id]
+ user_data = data.template_file.userdata.rendered
+ subnet_id = element(module.vpc.public_subnets,1)
+ tags = {
+ Name = "web-instance"
+ }
+}
+
+resource "aws_volume_attachment" "web" {
+ device_name = "/dev/sdh"
+ volume_id = aws_ebs_volume.web.id
+ instance_id = aws_instance.web.id
+}
 
 #definición del recurso EBS
 resource "aws_ebs_volume" "web" {
@@ -68,5 +95,13 @@ resource "aws_ebs_volume" "web" {
  tags = {
  Name = "web-ebs"
  }
+}
+
+resource "aws_eip" "eip" {
+  instance      = aws_instance.web.id
+  vpc           = true
+  tags          = {
+    Name        = "${var.project_name}-web-epi"
+  }
 }
 
