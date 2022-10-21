@@ -20,22 +20,31 @@ data "aws_ami" "rhel_8_5" {
   }
 }
 
+// 16kB tamaño maximo
+data "template_file" "userdata" {
+  template = file("${path.module}/user_data.sh")
+}
+
 
 resource "aws_instance" "web" {
-  # ami a instalar
-  ami = data.aws_ami.rhel_8_5.id
-  # tipo de instancia
-  instance_type = "t2.micro"
-  # clave ssh asociada por defecto
-  key_name = aws_key_pair.deployer.key_name
-  # zona de disponibilidad
-  availability_zone = var.availability_zone
-  vpc_security_group_ids = [aws_security_group.allow_ssh.id]
-  subnet_id = element(module.vpc.public_subnets,1)
-  tags = {
-    Name = "HelloWorld"
-  }
+ ami = data.aws_ami.rhel_8_5.id
+ availability_zone = var.availability_zone
+ instance_type = "t3.micro"
+ vpc_security_group_ids = [aws_security_group.allow_ssh.id]
+ user_data = data.template_file.userdata.rendered
+ key_name = aws_key_pair.deployer-key.key_name
+ tags = {
+ Name = "web-instance"
+ }
 }
+
+resource "aws_volume_attachment" "web" {
+ device_name = "/dev/sdh"
+ volume_id = aws_ebs_volume.web.id
+ instance_id = aws_instance.web.id
+}
+
+
 output "ip_instance" {
   value = aws_instance.web.public_ip
 }

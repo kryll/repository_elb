@@ -3,11 +3,12 @@ provider "aws" {
  region = "eu-west-3"
 }
 
+#Variables
 variable "ssh_key_path" {}
 variable "availability_zone" {}
 
 # Recurso de clave SSH en AWS
-resource "aws_key_pair" "deployer" {
+resource "aws_key_pair" "deployer-key" {
  key_name = "deployer-key"
  public_key = file(var.ssh_key_path)
  tags = {
@@ -15,7 +16,7 @@ resource "aws_key_pair" "deployer" {
  }
 }
 
-#EBS
+# MODULO DE VPC
 module "vpc" {
  source = "terraform-aws-modules/vpc/aws"
  name = "vpc-main"
@@ -30,6 +31,7 @@ module "vpc" {
  tags = { Terraform = "true", Environment = "dev" }
 }
 
+#Recurso SG - SSH y HTTP
 resource "aws_security_group" "allow_ssh" {
  name = "allow_ssh"
  description = "Allow SSH inbound traffic"
@@ -55,13 +57,16 @@ egress {
  }
 }
 
-resource "aws_instance" "web" {
- ami = data.aws_ami.rhel_8_5.id
- instance_type = "t3.micro"
- key_name = aws_key_pair.deployer.key_name
- vpc_security_group_ids = [aws_security_group.allow_ssh.id]
- subnet_id = element(module.vpc.public_subnets,1)
+
+
+#definición del recurso EBS
+resource "aws_ebs_volume" "web" {
+ availability_zone = var.availability_zone
+ size = 4
+ type = "gp3"
+ encrypted = true
  tags = {
- Name = "HelloWorld"
+ Name = "web-ebs"
  }
 }
+
